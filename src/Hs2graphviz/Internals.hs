@@ -16,7 +16,7 @@ import Maybe
 import Language.Haskell.Exts.Extension
 import Data.List
 import Data.Maybe
-
+import Data.List.Split
 
 
 files2dot :: [FilePath] -> IO String
@@ -210,11 +210,20 @@ isRecordInNames names record = result
     result = any (isRecordInName record) names -- (\n -> fullNameDecl n == snd record) names
 
 isRecordInName record name =
-  if fullNameQualified name
-  then sameName && fullNamePrefix name == fst record
+  if fullNameQualified name || modulePart /= ""
+  then sameName && fullNamePrefix name == modulePart -- fst record
   else sameName
   where
-    sameName = fullNameDecl name == snd record
+    sameName = fullNameDecl name == dataPart -- splitedName -- snd record
+    splitedName = splitOn "." (snd record)
+    modulePart :: String
+    modulePart = if 1 < length splitedName
+                 then head $ init splitedName
+                 else ""
+    dataPart :: String
+    dataPart = if 1 < length splitedName
+               then last splitedName
+               else head $ splitedName
 
 getModuleNameForRecord :: (Integer, (String,String)) -> [FullName] -> String
 getModuleNameForRecord (i, (key,value)) fullNames = result
@@ -231,7 +240,11 @@ showRef prefix moduleName name dataRelation =
 
 showLabel :: (Integer, (String, String)) -> String
 showLabel (i, (key,value)) =
-  " | <f" ++ show i ++ "> " ++ key ++ " :: " ++ value
+  " | <f" ++ show i ++ "> " ++ key ++ " :: " ++ dataPart
+  where
+    splitedValue = splitOn "." value
+    dataPart :: String
+    dataPart = last $ splitedValue
  
 showRecord :: String -> String -> String -> String -> (Integer, (String,String)) -> String
 showRecord prefix dataRelation moduleName valueModuleName (i, (key, value)) =
