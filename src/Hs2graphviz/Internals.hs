@@ -24,8 +24,10 @@ files2dot files = do
   files <- mapM readFile files
   let modules = map file2module files
       namesInModules = modules >>= moduleNames -- map moduleNames modules
+      names' = map (\n -> FullName (snd n) (getFullNameId n) (fst n) (fst n) False) namesInModules
   -- let code = foldr (++) "" files
-  return $ header ++ (modules >>= module2dot namesInModules)  ++ "}" -- foldr (++) [] $ map file2dot files
+  return $ header ++ (modules >>= module2dot names')  ++ "}" -- foldr (++) [] $ map file2dot files
+  --  error $ show modules -- 
 
 file2module :: String -> E.Module
 file2module file = res
@@ -46,18 +48,82 @@ file2module file = res
 --         (ParseFailed _ msg) -> throw $ ErrorCall msg
 --         (ParseOk m) -> module2dot m
 
-module2dot :: [(String,String)] -> E.Module -> String
+module2dot :: [FullName] -> E.Module -> String
 module2dot names (E.Module srcLoc moduleName opts mwarnings mExps imps decls) = result
   where
     result =
       (subgraphHeader moduleName) ++
-      (decls >>= decl2dot names) ++
+      (decls >>= (\n -> decl2dot n (getModuleName moduleName) ) allNames) ++
       (subgraphFooter)
-    -- node per decl
+    
+    -- filter away names in modules not imported into this module
+    allNames = importedNames ++ catMaybes (map (decl2fullname (getModuleName moduleName)) decls)
+    importedNames = catMaybes $ mapCross (transformNameOnImport $ getModuleName moduleName ) imps names ---  map (\i -> (map (\n -> transformNameOnImport i n) names) ) imps
 
-    -- -> per record
- 
--- decl2dot = show
+decl2fullname :: String -> E.Decl -> Maybe FullName
+decl2fullname moduleName (E.DataDecl _ _ _ name tyVarBind qualConDecl derivings) =
+  Just $ FullName name' (dot2Dash moduleName ++ "_" ++ name') moduleName moduleName False
+  where name' = name2string name
+decl2fullname _ _ = Nothing
+
+mapCross :: (a -> b -> c) -> [a] -> [b] -> [c]
+mapCross fn xs ys =
+  foldr (++) [] $ map (\x -> (map (\y -> fn x y) ys)) xs
+
+--  foldr (++) [] $ map (map fn as) bs
+
+-- | Can remove and transform FullName depending on ImportDecl.
+transformNameOnImport :: String -> ImportDecl -> FullName -> Maybe FullName       
+transformNameOnImport nameOfThisModule (ImportDecl iLoc (ModuleName iName) iQual _ _ iAlias iSpecs) fullname = result
+  where
+    result = if fullNameModule fullname == nameOfThisModule
+             then Just fullname
+             else
+               if iName /= fullNameModule fullname
+               then Nothing
+               else resultOfSpecs
+    resultOfSpecs =
+      case iSpecs of
+        Nothing -> Just $ resultOfQualified
+        Just specs -> filterImportedSpecs specs
+    filterImportedSpecs :: (Bool, [ImportSpec]) -> Maybe FullName
+    filterImportedSpecs (hide, specs) =
+      if any (\i -> compare (importSpecName i) (fullNameDecl fullname)) specs  -- include?
+      then Just $ resultOfQualified
+      else Nothing
+      where compare = if hide then (/=) else (==)
+    -- filterImportedSpecs False specs = any (\i -> importSpecName i == fullNameDecl fullname) specs   -- filter away if not in list
+
+    resultOfQualified :: FullName
+    resultOfQualified =
+      case iAlias of      
+        Nothing -> fullname
+        Just (ModuleName n) -> fullname { fullNamePrefix = n, fullNameQualified = True  }
+
+importSpecName :: ImportSpec -> String
+importSpecName (IVar n) = prettyPrint n
+importSpecName (IAbs n) = prettyPrint n
+importSpecName (IThingAll n) = prettyPrint n
+importSpecName (IThingWith n _) = prettyPrint n
+
+
+
+getModuleName :: E.ModuleName -> String
+getModuleName (E.ModuleName n) = n
+
+getFullNameId :: (String, String) -> String
+getFullNameId (modName, decName) =
+  dot2Dash modName ++ "_" ++ decName
+
+data FullName =
+  FullName {
+    fullNameDecl :: String, -- name used in analyzed module
+    fullNameId :: String, -- unique id in dot-file, original-module-name + original decl name
+    fullNameModule :: String, -- original name of module
+    fullNamePrefix :: String, -- prefix of module in analyzed module
+    fullNameQualified :: Bool -- if is qualified import
+  }
+  deriving (Show, Eq)
 
 subgraphHeader :: ModuleName -> String
 subgraphHeader (ModuleName n) = "subgraph cluster_" ++ n' ++ " {\ncolor=lightgrey;\nlabel = \"" ++ n ++ "\";\n"
@@ -76,13 +142,13 @@ declName :: E.Decl -> Maybe String
 declName (E.DataDecl _ _ _ name _ _ _ ) = Just $ name2string name
 declName _ = Nothing
 
-decl2dot :: [(String,String)] -> E.Decl -> String
+decl2dot :: [FullName] -> String -> E.Decl -> String
 
-decl2dot names (E.DataDecl _ _ _ name tyVarBind qualConDecl derivings) = result
+decl2dot names moduleName (E.DataDecl _ _ _ name tyVarBind qualConDecl derivings) = result
   where
     result = name' ++ qualConDecl' -- showNode name [] [] 
-    name' = showDataDecl dataTypeRefs (name2string name) [] []
-    qualConDecl' = qualConDecl >>= qualConDecl2dot names
+    name' = showDataDecl dataTypeRefs (name2string name) moduleName [] []
+    qualConDecl' = qualConDecl >>= (\c -> qualConDecl2dot names c moduleName) 
     dataTypeRefs :: [String]
     dataTypeRefs = map getDataTypeRefs qualConDecl
     getDataTypeRefs (E.QualConDecl _ _ _ c) = getConDeclName c
@@ -92,16 +158,19 @@ decl2dot names (E.DataDecl _ _ _ name tyVarBind qualConDecl derivings) = result
 -- node for name
 -- node per qualConDecl
 -- -> (inheritance) per qualConDecl to name
-decl2dot _ _ = "" 
+decl2dot _ _  _ = "" 
 
-qualConDecl2dot :: [(String,String)] -> E.QualConDecl -> String
+qualConDecl2dot :: [FullName] -> E.QualConDecl -> String -> String
 -- qualConDecl2dot = show --(E.QualConDecl 
-qualConDecl2dot names (E.QualConDecl _ _ _ c) = conDecl2dot names c
+qualConDecl2dot names (E.QualConDecl _ _ _ c) moduleName = conDecl2dot names c moduleName
 
-conDecl2dot :: [(String,String)] -> E.ConDecl -> String
-conDecl2dot names (E.ConDecl name bangTypes) = showConDecl names (name2string name) [] $ map (\b -> ("",bangType2String b)) bangTypes
-conDecl2dot names (E.InfixConDecl bangTypeL name bangTypeR) = showConDecl names (name2string name) [] [("",bangType2String bangTypeL),("", bangType2String bangTypeR) ]
-conDecl2dot names (E.RecDecl name nameBangTypes) = showConDecl names (name2string name) [] $ map nameBangType2String nameBangTypes
+conDecl2dot :: [FullName] -> E.ConDecl -> String -> String
+conDecl2dot names (E.ConDecl name bangTypes) moduleName =
+  showConDecl names (name2string name) moduleName [] $ map (\b -> ("",bangType2String b)) bangTypes
+conDecl2dot names (E.InfixConDecl bangTypeL name bangTypeR) moduleName =
+  showConDecl names (name2string name) moduleName [] [("",bangType2String bangTypeL),("", bangType2String bangTypeR) ]
+conDecl2dot names (E.RecDecl name nameBangTypes) moduleName =
+  showConDecl names (name2string name) moduleName [] $ map nameBangType2String nameBangTypes
 
 bangType2String :: E.BangType -> String
 bangType2String = prettyPrint
@@ -121,9 +190,9 @@ showConDecl = showNode "record" "condecl" []
 
 showDataDecl refs = showNode "record" "datadecl" refs []
  
-showNode :: String -> String -> [String] -> [(String,String)] -> String -> [String] -> [(String,String)] -> String
-showNode shape prefix refs names name instances records =
-    "\"" ++ prefix ++ "_" ++ name ++ "\" [\n" ++
+showNode :: String -> String -> [String] -> [FullName] -> String -> String -> [String] -> [(String,String)] -> String
+showNode shape prefix refs names name moduleName instances records =
+    "\"" ++ prefix ++ "_" ++ (dot2Dash moduleName) ++ "_" ++ name ++ "\" [\n" ++
       "label = \"<f0> " ++ name ++ (foldl (++) "" $ map showLabel recs) ++ "\"" ++ "\n" ++
       "shape = \"" ++ shape ++ "\"" ++ "\n" ++
       "];\n" ++
@@ -132,17 +201,31 @@ showNode shape prefix refs names name instances records =
     where
       recs = zip [1..] records
       recsForLine = zip [1..] $ filter (isRecordInNames names) records
-      showRef' = showRef "condecl" name
-      showRecord' = showRecord prefix name
+      showRef' = showRef "condecl" moduleName name
+      showRecord' r = showRecord prefix name moduleName (getModuleNameForRecord r names ) r
 
-isRecordInNames :: [(String,String)] -> (String,String) -> Bool
+isRecordInNames :: [FullName] -> (String,String) -> Bool
 isRecordInNames names record = result
   where
-    result = any (\n -> snd n == snd record) names
+    result = any (isRecordInName record) names -- (\n -> fullNameDecl n == snd record) names
 
-showRef :: String -> String -> String -> String
-showRef prefix name dataRelation =
-  "\""++ prefix ++"_" ++ dataRelation ++ "\":f"++ show 0 ++" -> \"datadecl_"++ name  ++"\":f0 ["++ arrowhead ++ "];\n"
+isRecordInName record name =
+  if fullNameQualified name
+  then sameName && fullNamePrefix name == fst record
+  else sameName
+  where
+    sameName = fullNameDecl name == snd record
+
+getModuleNameForRecord :: (Integer, (String,String)) -> [FullName] -> String
+getModuleNameForRecord (i, (key,value)) fullNames = result
+  where
+    result = fullNameId fullname
+    fullname = fromJust $ find (isRecordInName (key,value)) fullNames
+    
+
+showRef :: String -> String -> String -> String -> String
+showRef prefix moduleName name dataRelation =
+  "\""++ prefix ++"_"  ++ (dot2Dash moduleName) ++ "_" ++ dataRelation ++ "\":f"++ show 0 ++" -> \"datadecl_"++ (dot2Dash moduleName) ++ "_" ++ name  ++"\":f0 ["++ arrowhead ++ "];\n"
   where
     arrowhead = "arrowhead=onormal"
 
@@ -150,9 +233,9 @@ showLabel :: (Integer, (String, String)) -> String
 showLabel (i, (key,value)) =
   " | <f" ++ show i ++ "> " ++ key ++ " :: " ++ value
  
-showRecord :: String -> String -> (Integer, (String,String)) -> String
-showRecord prefix dataRelation (i, (key, value)) =
-  "\""++ prefix ++"_" ++ dataRelation ++ "\":f"++ show i ++" -> \"datadecl_"++ value  ++"\":f0 [];\n"
+showRecord :: String -> String -> String -> String -> (Integer, (String,String)) -> String
+showRecord prefix dataRelation moduleName valueModuleName (i, (key, value)) =
+  "\""++ prefix ++"_" ++ (dot2Dash moduleName) ++ "_" ++ dataRelation ++ "\":f"++ show i ++" -> \"datadecl_"++ valueModuleName  ++"\":f0 [];\n"
 
 
 

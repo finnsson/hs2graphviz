@@ -1,0 +1,2 @@
+runghc Hs2Dot.hs Hs2graphviz/BarCode.hs | dot -T pdf -o BarCode.pdf
+
