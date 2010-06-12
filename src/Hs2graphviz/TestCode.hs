@@ -1,4 +1,4 @@
-module Hs2Hraphviz.TestCode where
+module Hs2Graphviz.TestCode where
 
 import Data.ByteString.Lazy
 

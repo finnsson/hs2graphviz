@@ -49,12 +49,25 @@ file2module file = res
 module2dot :: [(String,String)] -> E.Module -> String
 module2dot names (E.Module srcLoc moduleName opts mwarnings mExps imps decls) = result
   where
-    result = decls >>= decl2dot names
+    result =
+      (subgraphHeader moduleName) ++
+      (decls >>= decl2dot names) ++
+      (subgraphFooter)
     -- node per decl
 
     -- -> per record
  
 -- decl2dot = show
+
+subgraphHeader :: ModuleName -> String
+subgraphHeader (ModuleName n) = "subgraph cluster_" ++ n' ++ " {\ncolor=lightgrey;\nlabel = \"" ++ n ++ "\";\n"
+  where n' = dot2Dash n
+
+dot2Dash :: String -> String
+dot2Dash value = map (\v -> if v == '.' then '_' else v) value
+
+subgraphFooter :: String
+subgraphFooter = "}\n"
 
 moduleNames :: E.Module -> [(String,String)]
 moduleNames (E.Module _ (ModuleName moduleName) _ _ _ _ decls) = zip (repeat moduleName) $ catMaybes $ map declName decls
