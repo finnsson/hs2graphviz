@@ -114,7 +114,7 @@ showNode shape prefix refs names name instances records =
       "label = \"<f0> " ++ name ++ (foldl (++) "" $ map showLabel recs) ++ "\"" ++ "\n" ++
       "shape = \"" ++ shape ++ "\"" ++ "\n" ++
       "];\n" ++
-      (recsForLine >>= showRecord') ++ --  (foldl (++) "" $ map showRecord' recs)
+      (recsForLine >>= showRecord') ++
       (refs >>= showRef')
     where
       recs = zip [1..] records
