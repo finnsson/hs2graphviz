@@ -22,33 +22,54 @@ import Data.Maybe
 files2dot :: [FilePath] -> IO String
 files2dot files = do
   files <- mapM readFile files
-  return $ header ++ (files >>= file2dot)  ++ "}" -- foldr (++) [] $ map file2dot files
+  let modules = map file2module files
+      namesInModules = modules >>= moduleNames -- map moduleNames modules
+  -- let code = foldr (++) "" files
+  return $ header ++ (modules >>= module2dot namesInModules)  ++ "}" -- foldr (++) [] $ map file2dot files
 
-file2dot :: String -> String
-file2dot file = res -- [] -- change this!!!
+file2module :: String -> E.Module
+file2module file = res
   where
     parsedModule = parseFileContents file -- fileCode
     res =
       case parsedModule of
         (ParseFailed _ msg) -> throw $ ErrorCall msg
-        (ParseOk m) -> module2dot m
+        (ParseOk m) -> m
 
-module2dot :: E.Module -> String
-module2dot (E.Module srcLoc moduleName opts mwarnings mExps imps decls) = result
+
+-- file2dot :: String -> String
+-- file2dot file = res
+--   where
+--     parsedModule = parseFileContents file -- fileCode
+--     res =
+--       case parsedModule of
+--         (ParseFailed _ msg) -> throw $ ErrorCall msg
+--         (ParseOk m) -> module2dot m
+
+module2dot :: [(String,String)] -> E.Module -> String
+module2dot names (E.Module srcLoc moduleName opts mwarnings mExps imps decls) = result
   where
-    result = decls >>= decl2dot
+    result = decls >>= decl2dot names
     -- node per decl
 
     -- -> per record
  
-decl2dot :: E.Decl -> String
 -- decl2dot = show
 
-decl2dot (E.DataDecl _ _ _ name tyVarBind qualConDecl derivings) = result
+moduleNames :: E.Module -> [(String,String)]
+moduleNames (E.Module _ (ModuleName moduleName) _ _ _ _ decls) = zip (repeat moduleName) $ catMaybes $ map declName decls
+
+declName :: E.Decl -> Maybe String
+declName (E.DataDecl _ _ _ name _ _ _ ) = Just $ name2string name
+declName _ = Nothing
+
+decl2dot :: [(String,String)] -> E.Decl -> String
+
+decl2dot names (E.DataDecl _ _ _ name tyVarBind qualConDecl derivings) = result
   where
     result = name' ++ qualConDecl' -- showNode name [] [] 
     name' = showDataDecl dataTypeRefs (name2string name) [] []
-    qualConDecl' = qualConDecl >>= qualConDecl2dot
+    qualConDecl' = qualConDecl >>= qualConDecl2dot names
     dataTypeRefs :: [String]
     dataTypeRefs = map getDataTypeRefs qualConDecl
     getDataTypeRefs (E.QualConDecl _ _ _ c) = getConDeclName c
@@ -58,16 +79,16 @@ decl2dot (E.DataDecl _ _ _ name tyVarBind qualConDecl derivings) = result
 -- node for name
 -- node per qualConDecl
 -- -> (inheritance) per qualConDecl to name
-decl2dot _ = "" 
+decl2dot _ _ = "" 
 
-qualConDecl2dot :: E.QualConDecl -> String
+qualConDecl2dot :: [(String,String)] -> E.QualConDecl -> String
 -- qualConDecl2dot = show --(E.QualConDecl 
-qualConDecl2dot (E.QualConDecl _ _ _ c) = conDecl2dot c
+qualConDecl2dot names (E.QualConDecl _ _ _ c) = conDecl2dot names c
 
-conDecl2dot :: E.ConDecl -> String
-conDecl2dot (E.ConDecl name bangTypes) = showConDecl  (name2string name) [] $ map (\b -> ("",bangType2String b)) bangTypes
-conDecl2dot (E.InfixConDecl bangTypeL name bangTypeR) = showConDecl  (name2string name) [] [("",bangType2String bangTypeL),("", bangType2String bangTypeR) ]
-conDecl2dot (E.RecDecl name nameBangTypes) = showConDecl (name2string name) [] $ map nameBangType2String nameBangTypes
+conDecl2dot :: [(String,String)] -> E.ConDecl -> String
+conDecl2dot names (E.ConDecl name bangTypes) = showConDecl names (name2string name) [] $ map (\b -> ("",bangType2String b)) bangTypes
+conDecl2dot names (E.InfixConDecl bangTypeL name bangTypeR) = showConDecl names (name2string name) [] [("",bangType2String bangTypeL),("", bangType2String bangTypeR) ]
+conDecl2dot names (E.RecDecl name nameBangTypes) = showConDecl names (name2string name) [] $ map nameBangType2String nameBangTypes
 
 bangType2String :: E.BangType -> String
 bangType2String = prettyPrint
@@ -85,24 +106,32 @@ arrow2dot = error "Not implemented yet."
 
 showConDecl = showNode "record" "condecl" []
 
-showDataDecl = showNode "record" "datadecl"
+showDataDecl refs = showNode "record" "datadecl" refs []
  
-showNode :: String -> String -> [String] -> String -> [String] -> [(String,String)] -> String
-showNode shape prefix refs name instances records =
+showNode :: String -> String -> [String] -> [(String,String)] -> String -> [String] -> [(String,String)] -> String
+showNode shape prefix refs names name instances records =
     "\"" ++ prefix ++ "_" ++ name ++ "\" [\n" ++
       "label = \"<f0> " ++ name ++ (foldl (++) "" $ map showLabel recs) ++ "\"" ++ "\n" ++
       "shape = \"" ++ shape ++ "\"" ++ "\n" ++
       "];\n" ++
-      (recs >>= showRecord') ++ --  (foldl (++) "" $ map showRecord' recs)
+      (recsForLine >>= showRecord') ++ --  (foldl (++) "" $ map showRecord' recs)
       (refs >>= showRef')
     where
       recs = zip [1..] records
+      recsForLine = zip [1..] $ filter (isRecordInNames names) records
       showRef' = showRef "condecl" name
       showRecord' = showRecord prefix name
 
+isRecordInNames :: [(String,String)] -> (String,String) -> Bool
+isRecordInNames names record = result
+  where
+    result = any (\n -> snd n == snd record) names
+
 showRef :: String -> String -> String -> String
 showRef prefix name dataRelation =
-  "\""++ prefix ++"_" ++ dataRelation ++ "\":f"++ show 0 ++" -> \"datadecl_"++ name  ++"\":f0 [];\n"
+  "\""++ prefix ++"_" ++ dataRelation ++ "\":f"++ show 0 ++" -> \"datadecl_"++ name  ++"\":f0 ["++ arrowhead ++ "];\n"
+  where
+    arrowhead = "arrowhead=onormal"
 
 showLabel :: (Integer, (String, String)) -> String
 showLabel (i, (key,value)) =

@@ -19,10 +19,10 @@ Synopsis:            Generate graphviz-code from Haskell-code.
 Homepage:            http://www.github.com/finnsson/hs2graphviz
 
 -- The license under which the package is released.
-License:             BSD3
+License:             OtherLicense
 
 -- The file containing the license text.
-License-file:        LICENSE
+License-file:        COPYING.txt
 
 -- The package author(s).
 Author:              Oscar Finnsson

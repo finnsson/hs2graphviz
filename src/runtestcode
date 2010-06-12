@@ -1,1 +1,1 @@
-runghc Hs2Dot.hs Hs2graphviz/TestCode.hs | dot -T pdf -o TestCode.pdf
+runghc Hs2Dot.hs Hs2graphviz/TestCode.hs Hs2graphviz/TestCodez.hs | dot -T pdf -o TestCode.pdf
