@@ -64,7 +64,13 @@ decl2fullname :: String -> E.Decl -> Maybe FullName
 decl2fullname moduleName (E.DataDecl _ _ _ name tyVarBind qualConDecl derivings) =
   Just $ FullName name' (dot2Dash moduleName ++ "_" ++ name') moduleName moduleName False
   where name' = name2string name
+decl2fullname moduleName (E.TypeDecl _ name _ _) = name2fullname moduleName name
+  
 decl2fullname _ _ = Nothing
+
+name2fullname :: String -> E.Name -> Maybe FullName
+name2fullname moduleName name = Just $ FullName name' (dot2Dash moduleName ++ "_" ++ name') moduleName moduleName False
+  where name' = name2string name
 
 mapCross :: (a -> b -> c) -> [a] -> [b] -> [c]
 mapCross fn xs ys =
@@ -140,9 +146,35 @@ moduleNames (E.Module _ (ModuleName moduleName) _ _ _ _ decls) = zip (repeat mod
 
 declName :: E.Decl -> Maybe String
 declName (E.DataDecl _ _ _ name _ _ _ ) = Just $ name2string name
+declName (E.TypeDecl _ name _ _ ) = Just $ name2string name
 declName _ = Nothing
 
 decl2dot :: [FullName] -> String -> E.Decl -> String
+
+decl2dot names moduleName (E.TypeDecl _ name tyVarBind t ) = result
+  where
+    result = name'
+    name' = showTypeDecl (name2string name) moduleName [] [("",prettyPrint t)]  -- []
+
+decl2dot names moduleName (E.ClassDecl _ _ name _ _ _) = name'
+  where
+    name' = showClassDecl (name2string name) moduleName [] []
+
+decl2dot names moduleName (E.InstDecl _ _ qname types _) = show'
+  where
+    show' = if 1 == length types
+            then showRef'
+            else ""
+    showRef' = showArrow "odiamond" "datadecl" moduleName  (prettyPrint $ head types)   "datadecl" name'  "Hs2Graphviz_TestCode"
+    name' = prettyPrint qname -- change this!!!
+
+-- showArrow :: String -> String -> String -> String -> String -> String -> String -> String
+-- showArrow arrowHead fromPrefix fromModuleName fromDataRelation toPrefix toName toModuleName =
+ 
+--  "Hs2Graphviz_TestCode"
+-- showRef :: String -> String -> String -> String -> String
+-- showRef prefix moduleName name dataRelation =
+
 
 decl2dot names moduleName (E.DataDecl _ _ _ name tyVarBind qualConDecl derivings) = result
   where
@@ -189,7 +221,9 @@ arrow2dot = error "Not implemented yet."
 showConDecl = showNode "record" "condecl" []
 
 showDataDecl refs = showNode "record" "datadecl" refs []
- 
+showClassDecl = showNode "record" "datadecl" [] [] 
+showTypeDecl = showNode "record" "datadecl" [] []
+
 showNode :: String -> String -> [String] -> [FullName] -> String -> String -> [String] -> [(String,String)] -> String
 showNode shape prefix refs names name moduleName instances records =
     "\"" ++ prefix ++ "_" ++ (dot2Dash moduleName) ++ "_" ++ name ++ "\" [\n" ++
@@ -237,6 +271,14 @@ showRef prefix moduleName name dataRelation =
   "\""++ prefix ++"_"  ++ (dot2Dash moduleName) ++ "_" ++ dataRelation ++ "\":f"++ show 0 ++" -> \"datadecl_"++ (dot2Dash moduleName) ++ "_" ++ name  ++"\":f0 ["++ arrowhead ++ "];\n"
   where
     arrowhead = "arrowhead=onormal"
+
+
+showArrow :: String -> String -> String -> String -> String -> String -> String -> String
+showArrow arrowHead fromPrefix fromModuleName fromDataRelation toPrefix toName toModuleName =
+  "\""++ fromPrefix ++"_"  ++ (dot2Dash fromModuleName) ++ "_" ++ fromDataRelation ++ "\":f"++ show 0 ++" -> \""++ toPrefix ++"_"++ (dot2Dash toModuleName) ++ "_" ++ toName  ++"\":f0 ["++ arrowhead ++ "];\n"
+  where
+    arrowhead = "arrowhead=" ++ arrowHead
+
 
 showLabel :: (Integer, (String, String)) -> String
 showLabel (i, (key,value)) =
