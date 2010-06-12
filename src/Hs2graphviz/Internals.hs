@@ -47,8 +47,14 @@ decl2dot :: E.Decl -> String
 decl2dot (E.DataDecl _ _ _ name tyVarBind qualConDecl derivings) = result
   where
     result = name' ++ qualConDecl' -- showNode name [] [] 
-    name' = showDataDecl  (name2string name) [] []
+    name' = showDataDecl dataTypeRefs (name2string name) [] []
     qualConDecl' = qualConDecl >>= qualConDecl2dot
+    dataTypeRefs :: [String]
+    dataTypeRefs = map getDataTypeRefs qualConDecl
+    getDataTypeRefs (E.QualConDecl _ _ _ c) = getConDeclName c
+    getConDeclName (E.ConDecl name _) = name2string name
+    getConDeclName (E.InfixConDecl _ name _ ) = name2string name
+    getConDeclName (E.RecDecl name _ ) = name2string name
 -- node for name
 -- node per qualConDecl
 -- -> (inheritance) per qualConDecl to name
@@ -77,20 +83,26 @@ name2string (E.Ident n) = n
 arrow2dot :: E.Decl -> String
 arrow2dot = error "Not implemented yet."
 
-showConDecl = showNode "record" "condecl"
+showConDecl = showNode "record" "condecl" []
 
 showDataDecl = showNode "record" "datadecl"
  
-showNode :: String -> String -> String -> [String] -> [(String,String)] -> String
-showNode shape prefix name instances records =
+showNode :: String -> String -> [String] -> String -> [String] -> [(String,String)] -> String
+showNode shape prefix refs name instances records =
     "\"" ++ prefix ++ "_" ++ name ++ "\" [\n" ++
       "label = \"<f0> " ++ name ++ (foldl (++) "" $ map showLabel recs) ++ "\"" ++ "\n" ++
       "shape = \"" ++ shape ++ "\"" ++ "\n" ++
-      "];" ++
-      (foldl (++) "" $ map showRecord' recs)
+      "];\n" ++
+      (recs >>= showRecord') ++ --  (foldl (++) "" $ map showRecord' recs)
+      (refs >>= showRef')
     where
       recs = zip [1..] records
+      showRef' = showRef "condecl" name
       showRecord' = showRecord prefix name
+
+showRef :: String -> String -> String -> String
+showRef prefix name dataRelation =
+  "\""++ prefix ++"_" ++ dataRelation ++ "\":f"++ show 0 ++" -> \"datadecl_"++ name  ++"\":f0 [];\n"
 
 showLabel :: (Integer, (String, String)) -> String
 showLabel (i, (key,value)) =
