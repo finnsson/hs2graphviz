@@ -17,8 +17,7 @@ import Language.Haskell.Exts.Extension
 import Data.List
 import Data.Maybe
 
--- createGraphvizCode :: TypeRelations -> String
--- createGraphvizCode typeRelations =
+
 
 files2dot :: [FilePath] -> IO String
 files2dot files = do
@@ -48,7 +47,7 @@ decl2dot :: E.Decl -> String
 decl2dot (E.DataDecl _ _ _ name tyVarBind qualConDecl derivings) = result
   where
     result = name' ++ qualConDecl' -- showNode name [] [] 
-    name' = showDataDecl "datadecl" (name2string name) [] []
+    name' = showDataDecl  (name2string name) [] []
     qualConDecl' = qualConDecl >>= qualConDecl2dot
 -- node for name
 -- node per qualConDecl
@@ -60,15 +59,13 @@ qualConDecl2dot :: E.QualConDecl -> String
 qualConDecl2dot (E.QualConDecl _ _ _ c) = conDecl2dot c
 
 conDecl2dot :: E.ConDecl -> String
-conDecl2dot (E.ConDecl name bangTypes) = showConDecl "condecl" (name2string name) [] $ map (\b -> ("",bangType2String b)) bangTypes
-conDecl2dot (E.InfixConDecl bangTypeL name bangTypeR) = showConDecl "condecl" (name2string name) [] [("",bangType2String bangTypeL),("", bangType2String bangTypeR) ]
-conDecl2dot (E.RecDecl name nameBangTypes) = showConDecl "condecl" (name2string name) [] $ map nameBangType2String nameBangTypes
+conDecl2dot (E.ConDecl name bangTypes) = showConDecl  (name2string name) [] $ map (\b -> ("",bangType2String b)) bangTypes
+conDecl2dot (E.InfixConDecl bangTypeL name bangTypeR) = showConDecl  (name2string name) [] [("",bangType2String bangTypeL),("", bangType2String bangTypeR) ]
+conDecl2dot (E.RecDecl name nameBangTypes) = showConDecl (name2string name) [] $ map nameBangType2String nameBangTypes
 
 bangType2String :: E.BangType -> String
 bangType2String = prettyPrint
--- bangType2String (BangedTy t) = prettyPrint t
--- bangType2String (UnBangedTy t) = prettyPrint t
--- bangType2String (UnpackedTy t) = prettyPrint t
+
 
 nameBangType2String :: ([Name],E.BangType) -> (String, String)
 nameBangType2String (names,bangType) = (maybe "" prettyPrint $ listToMaybe names, prettyPrint bangType)
@@ -80,9 +77,9 @@ name2string (E.Ident n) = n
 arrow2dot :: E.Decl -> String
 arrow2dot = error "Not implemented yet."
 
-showConDecl = showNode "record"
+showConDecl = showNode "record" "condecl"
 
-showDataDecl = showNode "record"
+showDataDecl = showNode "record" "datadecl"
  
 showNode :: String -> String -> String -> [String] -> [(String,String)] -> String
 showNode shape prefix name instances records =
@@ -104,83 +101,6 @@ showRecord prefix dataRelation (i, (key, value)) =
   "\""++ prefix ++"_" ++ dataRelation ++ "\":f"++ show i ++" -> \"datadecl_"++ value  ++"\":f0 [];\n"
 
 
--- Module SrcLoc ModuleName [OptionPragma] (Maybe WarningText) (Maybe [ExportSpec]) [ImportDecl] [Decl]	
-
-
---------------------------------------------------------------------------
---------------------------------------------------------------------------
---------------------------------------------------------------------------
----------- OLD CODE ------------------------------------------------------
---------------------------------------------------------------------------
---------------------------------------------------------------------------
---------------------------------------------------------------------------
-
-extractStructureFromFiles :: [FilePath] -> IO StructRelations
-extractStructureFromFiles files = do
-  files <- mapM readFile files
-  -- let pMod = parseModuleWithMode ( ParseMode "test" [TemplateHaskell] False False [] ) moduleCode
-  return $ StructRelations $ foldr (++) [] $ map extractFromFile files
-
-extractFromFile :: String -> [DataRelation]
-extractFromFile fileCode = []
-  where
-    pMod = parseModuleWithMode ( ParseMode "test" [TemplateHaskell] False False [] ) fileCode 
-    res =
-      case pMod of
-        (ParseFailed _ _) -> throw $ ErrorCall "Error"
-        (ParseOk m) -> extractFromHsModule m
-
-extractFromHsModule :: E.Module -> [DataRelation]
-extractFromHsModule (E.Module _ _ _ _ _ _ decls) =
-  map fromJust $ filter isJust $ map extractFromDecl decls
-
-extractFromDecl :: E.Decl -> Maybe DataRelation
-extractFromDecl (E.DataDecl _ _ _ name tyVarBind qualConDecl derivings) =
-  Just $ DataRelation name' [] [] -- last is records
-  where
-    name' = case name of
-              (Ident n) -> n
-              (Symbol n) -> n
-extractFromDecl _ = Nothing
-
-class ToGraphviz a where
-  toGV :: a -> String
-
-instance ToGraphviz DataRelation where
-  toGV (DataRelation name instances records) =
-    "\"node_" ++ name ++ "\" [\n" ++
-      "label = \"<f0> " ++ name ++ (foldl (++) "" $ map generateLabel recs) ++ "\"" ++ "\n" ++
-      "shape = \"record\"" ++ "\n" ++
-      "];" ++
-      (foldl (++) "" $ map serializeRecords' recs)
-    where
-      recs = zip [1..] records
-      serializeRecords' = serializeRecords name
-
--- instance ToGraphviz RelationRecord where
---   toGV (RelationRecord key value) =
-   
-generateLabel :: (Integer, RelationRecord) -> String
-generateLabel (i, RelationRecord key value) =
-  " | <f" ++ show i ++ "> " ++ key
- 
-serializeRecords :: String -> (Integer, RelationRecord) -> String
-serializeRecords dataRelation (i,RelationRecord key value) =
-  "\"node_" ++ dataRelation ++ "\":f"++ show i ++" -> \"node_"++ value  ++"\":f0 [];\n"
-
--- "node_bar":f1 -> "node4":f0 [
--- ];
-
-
--- "node0" [
--- label = "<f0> 0x10ba8| <f1>"
--- shape = "record"
--- ];
-
-instance ToGraphviz StructRelations where
-  toGV (StructRelations drs) =
-    header ++ (foldr (++) "" (map toGV drs)) ++ "}"
-    
 
 header =
   "digraph g {\n" ++
@@ -195,24 +115,3 @@ header =
   "];\n"
 
 
-data StructRelations =
-  StructRelations {
-    structRelationsData :: [DataRelation]
-  }
-  deriving (Show, Eq)
-
-data DataRelation =
-  DataRelation {
-    dataRelationName :: String,
-    dataRelationInstances :: [String],
-    dataRelationRecords :: [RelationRecord]
-  }
-  deriving (Show, Eq)
-
-data RelationRecord = RelationRecord String String
-  deriving (Show, Eq)
-
--- 1. get valid files
--- 2. extract data, type, newtype, class, instance
--- 3. create structure of relations
--- 4. print graphviz-code from structure
