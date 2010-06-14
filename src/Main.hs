@@ -1,4 +1,4 @@
-module Hs2Dot where
+module Main where
 
 import Hs2Graphviz.Internals
 

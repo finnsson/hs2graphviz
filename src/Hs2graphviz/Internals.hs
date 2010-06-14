@@ -27,7 +27,8 @@ files2dot files = do
       names' = map (\n -> FullName (snd n) (getFullNameId n) (fst n) (fst n) False) namesInModules
   -- let code = foldr (++) "" files
   return $ header ++ (modules >>= module2dot names')  ++ "}" -- foldr (++) [] $ map file2dot files
-  --  error $ show modules -- 
+  -- return $ error $ show modules -- 
+  -- return $ error $ show names'
 
 file2module :: String -> E.Module
 file2module file = res
@@ -58,14 +59,15 @@ module2dot names (E.Module srcLoc moduleName opts mwarnings mExps imps decls) = 
     
     -- filter away names in modules not imported into this module
     allNames = importedNames ++ catMaybes (map (decl2fullname (getModuleName moduleName)) decls)
-    importedNames = catMaybes $ mapCross (transformNameOnImport $ getModuleName moduleName ) imps names ---  map (\i -> (map (\n -> transformNameOnImport i n) names) ) imps
+    importedNames = catMaybes $ mapCross (transformNameOnImport $ getModuleName moduleName ) imps names 
+
 
 decl2fullname :: String -> E.Decl -> Maybe FullName
 decl2fullname moduleName (E.DataDecl _ _ _ name tyVarBind qualConDecl derivings) =
   Just $ FullName name' (dot2Dash moduleName ++ "_" ++ name') moduleName moduleName False
   where name' = name2string name
 decl2fullname moduleName (E.TypeDecl _ name _ _) = name2fullname moduleName name
-  
+decl2fullname moduleName (E.ClassDecl _ _ name _ _ _) = name2fullname moduleName name 
 decl2fullname _ _ = Nothing
 
 name2fullname :: String -> E.Name -> Maybe FullName
@@ -178,10 +180,11 @@ decl2dot names moduleName (E.InstDecl _ _ qname types _) = show'
 -- showRef prefix moduleName name dataRelation =
 
 
-decl2dot names moduleName (E.DataDecl _ _ _ name tyVarBind qualConDecl derivings) = result
+decl2dot names moduleName (E.DataDecl _ _ context name tyVarBind qualConDecl derivings) = result
   where
-    result = name' ++ qualConDecl' -- showNode name [] [] 
+    result = name' ++ qualConDecl' ++ asst' -- showNode name [] [] 
     name' = showDataDecl dataTypeRefs (name2string name) moduleName [] []
+    asst' = context >>= (asst2dot names (prettyPrint name) moduleName)
     qualConDecl' = qualConDecl >>= (\c -> qualConDecl2dot names c moduleName) 
     dataTypeRefs :: [String]
     dataTypeRefs = map getDataTypeRefs qualConDecl
@@ -205,6 +208,23 @@ conDecl2dot names (E.InfixConDecl bangTypeL name bangTypeR) moduleName =
   showConDecl names (name2string name) moduleName [] [("",bangType2String bangTypeL),("", bangType2String bangTypeR) ]
 conDecl2dot names (E.RecDecl name nameBangTypes) moduleName =
   showConDecl names (name2string name) moduleName [] $ map nameBangType2String nameBangTypes
+
+asst2dot :: [FullName] -> String -> String -> Asst -> String
+asst2dot fullnames declname moduleName (ClassA qname types) =
+  if isNameInNames classname fullnames
+  then varnames >>= (asst2dot' (getFullNameForName classname fullnames))
+  else error $classname ++ show ( length fullnames) -- ""
+  where
+    classname = prettyPrint qname
+    varnames = map prettyPrint types
+    asst2dot' :: FullName -> String -> String
+    asst2dot' fullname varname =
+      showArrow "diamond" "datadecl" moduleName declname "datadecl" (classname) (fullNameModule fullname)
+
+-- showArrow :: String -> String -> String -> String -> String -> String -> String -> String
+-- showArrow arrowHead fromPrefix fromModuleName fromDataRelation toPrefix toName toModuleName =
+
+asst2dot _ _ _ _ = ""
 
 bangType2String :: E.BangType -> String
 bangType2String = prettyPrint

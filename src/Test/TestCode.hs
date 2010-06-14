@@ -18,3 +18,8 @@ class To42 a where
 
 instance To42 File where
   to = 42
+
+instance Monad File where
+  fail msg = File undefined msg
+
+data To42 a => Holds42 a = Holds a
