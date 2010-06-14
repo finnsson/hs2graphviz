@@ -1,6 +1,6 @@
-module Hs2Graphviz.BarCode where
+module Test.BarCode where
 
-import qualified Hs2Graphviz.TestCodez as X
+import qualified Test.TestCodez as X
 
 -- DATA TYPES
 

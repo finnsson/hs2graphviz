@@ -1,6 +1,6 @@
-module Hs2Graphviz.TestCodez where
+module Test.TestCodez where
 
-import Hs2Graphviz.TestCode
+import Test.TestCode
 
 -- DATA TYPES
 
