@@ -147,6 +147,7 @@ moduleNames (E.Module _ (ModuleName moduleName) _ _ _ _ decls) = zip (repeat mod
 declName :: E.Decl -> Maybe String
 declName (E.DataDecl _ _ _ name _ _ _ ) = Just $ name2string name
 declName (E.TypeDecl _ name _ _ ) = Just $ name2string name
+declName (E.ClassDecl _ _ name _ _ _) = Just $ name2string name
 declName _ = Nothing
 
 decl2dot :: [FullName] -> String -> E.Decl -> String
@@ -162,11 +163,12 @@ decl2dot names moduleName (E.ClassDecl _ _ name _ _ _) = name'
 
 decl2dot names moduleName (E.InstDecl _ _ qname types _) = show'
   where
-    show' = if 1 == length types
+    show' = if 1 == length types && isNameInNames name' names
             then showRef'
             else ""
-    showRef' = showArrow "odiamond" "datadecl" moduleName  (prettyPrint $ head types)   "datadecl" name'  "Hs2Graphviz_TestCode"
+    showRef' = showArrow "odiamond" "datadecl" moduleName  (prettyPrint $ head types)   "datadecl" name' (fullNameModule fullClassName) -- "Hs2Graphviz_TestCode"
     name' = prettyPrint qname -- change this!!!
+    fullClassName = getFullNameForName name' names
 
 -- showArrow :: String -> String -> String -> String -> String -> String -> String -> String
 -- showArrow arrowHead fromPrefix fromModuleName fromDataRelation toPrefix toName toModuleName =
@@ -243,6 +245,24 @@ isRecordInNames names record = result
   where
     result = any (isRecordInName record) names -- (\n -> fullNameDecl n == snd record) names
 
+isNameInNames :: String -> [FullName] -> Bool
+isNameInNames name names = any (isNameTheName name) names
+
+isNameTheName :: String -> FullName -> Bool
+isNameTheName left fullname =
+      if fullNameQualified fullname || modulePart /= ""
+      then sameName && fullNamePrefix fullname == modulePart
+      else sameName
+      where
+        sameName = fullNameDecl fullname == dataPart
+        splitedName = splitOn "." left
+        modulePart = if 1 < length splitedName
+                     then head $ init splitedName
+                     else ""
+        dataPart = if 1 < length splitedName
+                   then last splitedName
+                   else head $ splitedName
+
 isRecordInName record name =
   if fullNameQualified name || modulePart /= ""
   then sameName && fullNamePrefix name == modulePart -- fst record
@@ -258,6 +278,11 @@ isRecordInName record name =
     dataPart = if 1 < length splitedName
                then last splitedName
                else head $ splitedName
+
+getFullNameForName :: String -> [FullName] -> FullName 
+getFullNameForName name fullnames = fullname
+  where
+    fullname = fromJust $ find (isNameTheName name) fullnames
 
 getModuleNameForRecord :: (Integer, (String,String)) -> [FullName] -> String
 getModuleNameForRecord (i, (key,value)) fullNames = result
