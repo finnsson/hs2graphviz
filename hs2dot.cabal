@@ -13,7 +13,14 @@ Version:             0.1.1
 Synopsis:            Generate graphviz-code from Haskell-code.
 
 -- A longer description of the package.
--- Description:         
+Description: 
+   @hs2dot@ can generate graphviz code by analyzing Haskell source code.
+   .
+   Usage (to generate a pdf from a source code file Hack.hs)
+   > hs2dot Hack.hs | dot -T pdf -o Hack.pdf
+   .
+   You can analyze multiple modules together:
+   > hs2dot Foo.hs Bar.hs | dot -T png FooBar.png
 
 -- URL for the project homepage or repository.
 Homepage:            http://www.github.com/finnsson/hs2graphviz
