@@ -1,1 +1,1 @@
-runghc Hs2Dot.hs Test/TestCode.hs Test/TestCodez.hs Test/BarCode.hs | dot -T pdf -o TestCode.pdf
+runghc Main.hs Test/TestCode.hs Test/TestCodez.hs Test/BarCode.hs | dot -T pdf -o TestCode.pdf

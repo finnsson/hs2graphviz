@@ -1,4 +1,4 @@
-module Hs2Graphviz.Internals where
+module Hs2Dot.Internals where
 
 import System.Environment (getArgs)
 import System.IO (FilePath)
@@ -12,7 +12,6 @@ import Language.Haskell.Exts.Pretty (prettyPrint)
 import Language.Haskell.Exts.Syntax as E
 import Language.Haskell.Syntax
 -- import Text.Regex.Posix
-import Maybe
 import Language.Haskell.Exts.Extension
 import Data.List
 import Data.Maybe
@@ -58,7 +57,7 @@ module2dot names (E.Module srcLoc moduleName opts mwarnings mExps imps decls) = 
       (subgraphFooter)
     
     -- filter away names in modules not imported into this module
-    allNames = importedNames ++ catMaybes (map (decl2fullname (getModuleName moduleName)) decls)
+    allNames = importedNames ++ (mapMaybe (decl2fullname (getModuleName moduleName)) decls)
     importedNames = catMaybes $ mapCross (transformNameOnImport $ getModuleName moduleName ) imps names 
 
 
@@ -76,7 +75,7 @@ name2fullname moduleName name = Just $ FullName name' (dot2Dash moduleName ++ "_
 
 mapCross :: (a -> b -> c) -> [a] -> [b] -> [c]
 mapCross fn xs ys =
-  foldr (++) [] $ map (\x -> (map (\y -> fn x y) ys)) xs
+  concatMap (\x -> (map (fn x) ys)) xs
 
 --  foldr (++) [] $ map (map fn as) bs
 
@@ -144,7 +143,7 @@ subgraphFooter :: String
 subgraphFooter = "}\n"
 
 moduleNames :: E.Module -> [(String,String)]
-moduleNames (E.Module _ (ModuleName moduleName) _ _ _ _ decls) = zip (repeat moduleName) $ catMaybes $ map declName decls
+moduleNames (E.Module _ (ModuleName moduleName) _ _ _ _ decls) = zip (repeat moduleName) $ mapMaybe declName decls
 
 declName :: E.Decl -> Maybe String
 declName (E.DataDecl _ _ _ name _ _ _ ) = Just $ name2string name
@@ -266,7 +265,7 @@ isRecordInNames names record = result
     result = any (isRecordInName record) names -- (\n -> fullNameDecl n == snd record) names
 
 isNameInNames :: String -> [FullName] -> Bool
-isNameInNames name names = any (isNameTheName name) names
+isNameInNames name  = any (isNameTheName name)
 
 isNameTheName :: String -> FullName -> Bool
 isNameTheName left fullname =
