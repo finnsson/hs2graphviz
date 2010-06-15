@@ -6,7 +6,7 @@ import Control.Monad (filterM)
 import System.Directory (doesFileExist)
 import Control.Exception (throw, ErrorCall (..))
 
-import Language.Haskell.Exts (parseFileContents)
+import Language.Haskell.Exts (parseFileContentsWithMode)
 import Language.Haskell.Exts.Parser
 import Language.Haskell.Exts.Pretty (prettyPrint)
 import Language.Haskell.Exts.Syntax as E
@@ -32,7 +32,7 @@ files2dot files = do
 file2module :: String -> E.Module
 file2module file = res
   where
-    parsedModule = parseFileContents file -- fileCode
+    parsedModule = parseFileContentsWithMode (defaultParseMode { extensions = knownExtensions } ) file -- fileCode
     res =
       case parsedModule of
         (ParseFailed _ msg) -> throw $ ErrorCall msg
@@ -164,20 +164,13 @@ decl2dot names moduleName (E.ClassDecl _ _ name _ _ _) = name'
 
 decl2dot names moduleName (E.InstDecl _ _ qname types _) = show'
   where
-    show' = if 1 == length types && isNameInNames name' names
+    show' = if 1 == length types && isNameInNames name' names && isNameInNames dataTypeName names
             then showRef'
             else ""
-    showRef' = showArrow "odiamond" "datadecl" moduleName  (prettyPrint $ head types)   "datadecl" name' (fullNameModule fullClassName) -- "Hs2Graphviz_TestCode"
+    showRef' = showArrow "odiamond" "datadecl" moduleName  (prettyPrint $ head types)   "datadecl" name' (fullNameModule fullClassName)
     name' = prettyPrint qname -- change this!!!
+    dataTypeName = prettyPrint $ head types
     fullClassName = getFullNameForName name' names
-
--- showArrow :: String -> String -> String -> String -> String -> String -> String -> String
--- showArrow arrowHead fromPrefix fromModuleName fromDataRelation toPrefix toName toModuleName =
- 
---  "Hs2Graphviz_TestCode"
--- showRef :: String -> String -> String -> String -> String
--- showRef prefix moduleName name dataRelation =
-
 
 decl2dot names moduleName (E.DataDecl _ _ context name tyVarBind qualConDecl derivings) = result
   where
