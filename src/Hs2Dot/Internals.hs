@@ -139,6 +139,9 @@ subgraphHeader (ModuleName n) = "subgraph cluster_" ++ n' ++ " {\ncolor=lightgre
 dot2Dash :: String -> String
 dot2Dash value = map (\v -> if v == '.' then '_' else v) value
 
+escapeName :: String -> String
+escapeName value = value >>= (\v -> if v == '>' then ['\\',v] else [v])
+
 subgraphFooter :: String
 subgraphFooter = "}\n"
 
@@ -156,7 +159,8 @@ decl2dot :: [FullName] -> String -> E.Decl -> String
 decl2dot names moduleName (E.TypeDecl _ name tyVarBind t ) = result
   where
     result = name'
-    name' = showTypeDecl (name2string name) moduleName [] [("",prettyPrint t)]  -- []
+    name' = showTypeDecl (name2string name) moduleName [] [("",t')]  -- []
+    t' = escapeName $ prettyPrint t
 
 decl2dot names moduleName (E.ClassDecl _ _ name _ _ _) = name'
   where
