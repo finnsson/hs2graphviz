@@ -7,3 +7,7 @@ import qualified Test.TestCodez as X
 data Foo = Feet
 
 data Bar = Bar Foo | Fooz { left :: X.Foo }
+
+data Goo = Goo Foo
+
+data Hoo = Hoo Goo

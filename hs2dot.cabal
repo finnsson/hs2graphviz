@@ -7,7 +7,7 @@ Name:                hs2dot
 -- The package version. See the Haskell package versioning policy
 -- (http://www.haskell.org/haskellwiki/Package_versioning_policy) for
 -- standards guiding when and how versions should be incremented.
-Version:             0.1.2
+Version:             0.1.4
 
 -- A short (one-line) description of the package.
 Synopsis:            Generate graphviz-code from Haskell-code.
@@ -23,6 +23,12 @@ Description:
    You can analyze multiple modules together:
    .
    > hs2dot Foo.hs Bar.hs | dot -T png -o FooBar.png
+   .
+   Changelog:
+   .
+   0.1.3: Updated dependencies to be less picky.
+   .
+   0.1.4: Included Hs2Dot.Internals in sdist
 
 -- URL for the project homepage or repository.
 Homepage:            http://www.github.com/finnsson/hs2graphviz
@@ -60,10 +66,10 @@ executable hs2dot
   Main-is: Main.hs          
   
   -- Packages needed in order to build this package.
-  build-depends:       base >= 4 && < 5, directory >= 1.0.1.1, split >= 0.1.2, haskell-src-exts >= 1.9.0, haskell98, haskell-src >= 1.0.1.3
+  build-depends:       base >= 4 && < 5, directory >= 1.0 && < 1.1, split >= 0.1.2, haskell-src-exts >= 1.9 && < 2.0, haskell98, haskell-src >= 1.0 && < 1.1
   
   -- Modules not exported by this package.
-  -- Other-modules:       
+  Other-modules:       Hs2Dot.Helper, Hs2Dot.Src, Hs2Dot.SrcHelper, Hs2Dot.DotHelper, Hs2Dot.Dot
   
   -- Extra tools (e.g. alex, hsc2hs, ...) needed to build the source.
   -- Build-tools:         
