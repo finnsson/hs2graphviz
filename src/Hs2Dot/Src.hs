@@ -75,7 +75,7 @@ decl2dot conf names moduleName (E.ClassDecl _ _ name _ _ _) = name'
   where
     name' = showClassDecl (pretty name) moduleName []
 
-decl2dot conf names moduleName (E.InstDecl _ _ qname types _) = show'
+decl2dot conf names moduleName (E.InstDecl _ _ _ _ qname types _) = show'
   where
     show' = if 1 == length types && isInNames names name' && isInNames names dataTypeName
             then showRef'
