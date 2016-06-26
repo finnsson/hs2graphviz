@@ -51,7 +51,7 @@ name2fullname moduleName name = Just $ FullName name' (dot2Dash moduleName ++ "_
 
 -- | Can remove and transform FullName depending on ImportDecl.
 transformNameOnImport :: String -> ImportDecl -> FullName -> Maybe FullName       
-transformNameOnImport nameOfThisModule (ImportDecl iLoc (ModuleName iName) iQual _ _ iAlias iSpecs) fullname = result
+transformNameOnImport nameOfThisModule (ImportDecl iLoc (ModuleName iName) iQual _ _ _ iAlias iSpecs) fullname = result
   where
     result = if fullNameModule fullname == nameOfThisModule
              then Just fullname
@@ -82,10 +82,10 @@ transformNameOnImport nameOfThisModule (ImportDecl iLoc (ModuleName iName) iQual
 -- bangType2String = prettyPrint
 
 -- | Returns the (name,type) pretty-printed 
-nameBangType2String :: ([Name],E.BangType) -> (String, String)
+nameBangType2String :: ([Name],E.Type) -> (String, String)
 nameBangType2String (names,bangType) = (maybe "" prettyPrint $ listToMaybe names, pretty bangType)
 
-bangType2StringIfInNames :: [FullName] -> E.BangType ->  Maybe String
+bangType2StringIfInNames :: [FullName] -> E.Type ->  Maybe String
 bangType2StringIfInNames names bangType = result
   where
     nameOfBangType = pretty bangType
@@ -100,7 +100,7 @@ bangType2StringIfInNames names bangType = result
 class Pretty a where
   pretty :: a -> String
 
-instance Pretty E.BangType where
+instance Pretty E.Type where
   pretty = prettyPrint
 
 instance Pretty E.Name where
@@ -113,6 +113,6 @@ instance Pretty E.ModuleName where
 
 instance Pretty ImportSpec where
   pretty (IVar n) = prettyPrint n
-  pretty (IAbs n) = prettyPrint n
+  pretty (IAbs _ n) = prettyPrint n
   pretty (IThingAll n) = prettyPrint n
   pretty (IThingWith n _) = prettyPrint n
